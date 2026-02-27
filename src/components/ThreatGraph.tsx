@@ -16,12 +16,17 @@ interface ThreatIndicator {
   reference: string;
   reporter: string;
   source: string;
+  forensic_links?: {
+    type: 'downloaded_from' | 'contained_in' | 'pe_parent' | 'dns_mapping';
+    target: string;
+    timestamp?: string;
+  }[];
 }
 
 interface Node extends d3.SimulationNodeDatum {
   id: string;
   label: string;
-  type: 'threat' | 'malware' | 'ioc_type' | 'source';
+  type: 'threat' | 'malware' | 'ioc_type' | 'source' | 'file' | 'url' | 'ip' | 'domain';
   confidence?: number;
 }
 
@@ -68,6 +73,22 @@ export const ThreatGraph: React.FC<{ threats: ThreatIndicator[] }> = ({ threats 
       links.push({ source: threatId, target: malwareId });
       links.push({ source: threatId, target: iocTypeId });
       links.push({ source: threatId, target: sourceId });
+
+      // Add forensic links
+      if (threat.forensic_links) {
+        threat.forensic_links.forEach((link, lIdx) => {
+          const targetId = `forensic-${link.type}-${link.target}`;
+          let nodeType: Node['type'] = 'file';
+          
+          if (link.type === 'downloaded_from') nodeType = 'url';
+          else if (link.type === 'dns_mapping') nodeType = 'ip';
+          else if (link.type === 'pe_parent') nodeType = 'file';
+          else if (link.type === 'contained_in') nodeType = 'file';
+
+          addNode(targetId, link.target, nodeType);
+          links.push({ source: threatId, target: targetId });
+        });
+      }
     });
 
     const svg = d3.select(svgRef.current)
@@ -108,6 +129,10 @@ export const ThreatGraph: React.FC<{ threats: ThreatIndicator[] }> = ({ threats 
           case 'malware': return "#818cf8";
           case 'ioc_type': return "#a78bfa";
           case 'source': return "#2dd4bf";
+          case 'file': return "#f472b6";
+          case 'url': return "#fb923c";
+          case 'ip': return "#60a5fa";
+          case 'domain': return "#34d399";
           default: return "#94a3b8";
         }
       })
@@ -178,6 +203,18 @@ export const ThreatGraph: React.FC<{ threats: ThreatIndicator[] }> = ({ threats 
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-teal-400" />
           <span className="text-[8px] uppercase tracking-widest opacity-60">Intelligence Source</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-pink-400" />
+          <span className="text-[8px] uppercase tracking-widest opacity-60">File / Artifact</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-orange-400" />
+          <span className="text-[8px] uppercase tracking-widest opacity-60">Download URL</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-blue-400" />
+          <span className="text-[8px] uppercase tracking-widest opacity-60">Network (IP/DNS)</span>
         </div>
       </div>
       <svg ref={svgRef} className="cursor-move" />

@@ -70,6 +70,11 @@ interface ThreatIndicator {
   reference: string;
   reporter: string;
   source: string;
+  forensic_links?: {
+    type: 'downloaded_from' | 'contained_in' | 'pe_parent' | 'dns_mapping';
+    target: string;
+    timestamp?: string;
+  }[];
 }
 
 enum AgentStatus {
@@ -126,10 +131,28 @@ export default function App() {
       const data = await res.json();
       if (data.query_status === 'ok' && Array.isArray(data.data)) {
         const sourceLabel = data.source === 'simulated' ? 'Aegis Internal Sentinel' : 'ThreatFox';
-        const threatsWithSource = data.data.slice(0, 20).map((t: any) => ({
-          ...t,
-          source: sourceLabel
-        }));
+        const threatsWithSource = data.data.slice(0, 20).map((t: any, idx: number) => {
+          // Simulate forensic links for demonstration
+          const links = [];
+          if (idx % 3 === 0) {
+            links.push({ type: 'downloaded_from', target: `https://cdn.malware-dist.net/payload_${idx}.exe` });
+          }
+          if (idx % 4 === 0) {
+            links.push({ type: 'dns_mapping', target: `103.24.201.${10 + idx}` });
+          }
+          if (idx % 5 === 0) {
+            links.push({ type: 'pe_parent', target: `explorer.exe` });
+          }
+          if (idx % 7 === 0) {
+            links.push({ type: 'contained_in', target: `update_package.zip` });
+          }
+
+          return {
+            ...t,
+            source: sourceLabel,
+            forensic_links: links.length > 0 ? links : undefined
+          };
+        });
         setThreats(threatsWithSource);
         if (data.source === 'simulated') {
           setThreatStatus('simulated');
@@ -844,6 +867,42 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* Forensic Infrastructure Links */}
+                {selectedThreat.forensic_links && selectedThreat.forensic_links.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t border-white/5">
+                    <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Forensic Infrastructure Links</label>
+                    <div className="space-y-2">
+                      {selectedThreat.forensic_links.map((link, lIdx) => (
+                        <div key={lIdx} className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/5 group/link">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded flex items-center justify-center ${
+                              link.type === 'downloaded_from' ? 'bg-orange-500/10 text-orange-400' :
+                              link.type === 'dns_mapping' ? 'bg-blue-500/10 text-blue-400' :
+                              'bg-pink-500/10 text-pink-400'
+                            }`}>
+                              {link.type === 'downloaded_from' ? <Globe className="w-4 h-4" /> :
+                               link.type === 'dns_mapping' ? <Activity className="w-4 h-4" /> :
+                               <Database className="w-4 h-4" />}
+                            </div>
+                            <div>
+                              <div className="text-[9px] uppercase opacity-40 font-bold">
+                                {link.type.replace(/_/g, ' ')}
+                              </div>
+                              <div className="text-xs font-mono text-white/80 break-all">{link.target}</div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => window.open(link.type === 'downloaded_from' ? link.target : `https://www.google.com/search?q=${encodeURIComponent(link.target)}`, '_blank')}
+                            className="p-2 hover:bg-white/10 rounded opacity-0 group-hover/link:opacity-100 transition-opacity"
+                          >
+                            <ExternalLink className="w-4 h-4 opacity-40" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Attribution & Source */}
                 <div className="grid grid-cols-2 gap-8 pt-4 border-t border-white/5">
