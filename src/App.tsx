@@ -67,6 +67,7 @@ interface ThreatIndicator {
   last_seen: string;
   reference: string;
   reporter: string;
+  source: string;
 }
 
 enum AgentStatus {
@@ -98,6 +99,7 @@ export default function App() {
   const [threatStatus, setThreatStatus] = useState<'connected' | 'error' | 'idle' | 'simulated'>('idle');
   const [iocTypeFilter, setIocTypeFilter] = useState('all');
   const [threatTypeFilter, setThreatTypeFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [minConfidence, setMinConfidence] = useState(0);
   const [agents, setAgents] = useState<Agent[]>([
     { id: '1', name: 'RustArchitect', status: AgentStatus.Approved },
@@ -120,7 +122,12 @@ export default function App() {
       const res = await fetch('/api/threat-intel');
       const data = await res.json();
       if (data.query_status === 'ok' && Array.isArray(data.data)) {
-        setThreats(data.data.slice(0, 20));
+        const sourceLabel = data.source === 'simulated' ? 'Aegis Internal Sentinel' : 'ThreatFox';
+        const threatsWithSource = data.data.slice(0, 20).map((t: any) => ({
+          ...t,
+          source: sourceLabel
+        }));
+        setThreats(threatsWithSource);
         if (data.source === 'simulated') {
           setThreatStatus('simulated');
           addLog("[WARN] External threat feed unreachable. Using internal Aegis simulation.");
@@ -230,12 +237,14 @@ export default function App() {
   const filteredThreats = threats.filter(threat => {
     const matchesIocType = iocTypeFilter === 'all' || threat.ioc_type_desc === iocTypeFilter;
     const matchesThreatType = threatTypeFilter === 'all' || threat.threat_type_desc === threatTypeFilter;
+    const matchesSource = sourceFilter === 'all' || threat.source === sourceFilter;
     const matchesConfidence = threat.confidence_level >= minConfidence;
-    return matchesIocType && matchesThreatType && matchesConfidence;
+    return matchesIocType && matchesThreatType && matchesSource && matchesConfidence;
   });
 
   const uniqueIocTypes = Array.from(new Set(threats.map(t => t.ioc_type_desc)));
   const uniqueThreatTypes = Array.from(new Set(threats.map(t => t.threat_type_desc)));
+  const uniqueSources = Array.from(new Set(threats.map(t => t.source)));
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-[#E0E0E0] font-mono selection:bg-emerald-500/30">
@@ -455,6 +464,23 @@ export default function App() {
                       </select>
                     </div>
                     <div className="space-y-1">
+                      <label className="text-[9px] uppercase opacity-40 flex items-center gap-1">
+                        <Database className="w-2.5 h-2.5" /> Source
+                      </label>
+                      <select 
+                        value={sourceFilter}
+                        onChange={(e) => setSourceFilter(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] outline-none focus:border-emerald-500/50"
+                      >
+                        <option value="all">All Sources</option>
+                        {uniqueSources.map(source => (
+                          <option key={source} value={source}>
+                            {source} ({threats.filter(t => t.source === source).length})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
                       <label className="text-[9px] uppercase opacity-40">Min Confidence: {minConfidence}%</label>
                       <input 
                         type="range" 
@@ -538,12 +564,22 @@ export default function App() {
                               </p>
                             </div>
                             <div className="col-span-3 space-y-1">
-                              <div className="text-[10px] text-white/70 truncate font-bold">
-                                {threat.malware_printable || 'Unknown Malware'}
+                              <div className="space-y-0.5">
+                                <div className="text-[10px] text-white/70 truncate font-bold">
+                                  {threat.malware_printable || 'Unknown Malware'}
+                                </div>
+                                {threat.malware && threat.malware !== 'unknown' && (
+                                  <div className="text-[8px] opacity-40 font-mono truncate">
+                                    ID: {threat.malware}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5 text-[9px] opacity-40">
                                 <User className="w-2.5 h-2.5" />
                                 {threat.reporter}
+                              </div>
+                              <div className="text-[8px] uppercase tracking-tighter opacity-30 font-bold">
+                                Source: {threat.source}
                               </div>
                             </div>
                             <div className="col-span-2 text-right">
