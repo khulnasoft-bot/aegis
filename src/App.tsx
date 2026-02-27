@@ -28,10 +28,12 @@ import {
   User,
   Filter,
   SearchCode,
-  ShieldAlert
+  ShieldAlert,
+  Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
+import { ThreatGraph } from './components/ThreatGraph';
 
 // --- Types ---
 
@@ -398,6 +400,20 @@ export default function App() {
                   <StatCard label="Memory Entropy" value="0.0042" trend="-0.01%" />
                   <StatCard label="Governance Score" value="98.2" trend="STABLE" />
                 </div>
+
+                {/* Real Threat Graph */}
+                <section className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-indigo-500/10 border border-indigo-500/30 rounded flex items-center justify-center">
+                      <Share2 className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold uppercase tracking-widest text-white">Real Threat Graph</h2>
+                      <p className="text-[10px] opacity-50 uppercase">Explore dataset visually // Discover threat commonalities</p>
+                    </div>
+                  </div>
+                  <ThreatGraph threats={threats} />
+                </section>
 
                 {/* Threat Intelligence Feed */}
                 <section className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
