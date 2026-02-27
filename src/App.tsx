@@ -101,6 +101,7 @@ export default function App() {
   const [threatTypeFilter, setThreatTypeFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [minConfidence, setMinConfidence] = useState(0);
+  const [selectedThreat, setSelectedThreat] = useState<ThreatIndicator | null>(null);
   const [agents, setAgents] = useState<Agent[]>([
     { id: '1', name: 'RustArchitect', status: AgentStatus.Approved },
     { id: '2', name: 'PerfOptimizer', status: AgentStatus.Approved },
@@ -519,9 +520,9 @@ export default function App() {
                                 <Terminal className="w-3 h-3 text-red-400 shrink-0" />
                                 <span className="text-[10px] font-mono truncate text-red-200/80 flex-1">
                                   <button 
-                                    onClick={() => window.open(`https://www.virustotal.com/gui/search/${encodeURIComponent(threat.ioc)}`, '_blank')}
+                                    onClick={() => setSelectedThreat(threat)}
                                     className="hover:text-red-400 hover:underline transition-all text-left truncate w-full"
-                                    title={`VirusTotal Lookup: ${threat.ioc}`}
+                                    title={`View Details: ${threat.ioc}`}
                                   >
                                     {threat.ioc}
                                   </button>
@@ -715,6 +716,168 @@ export default function App() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Threat Detail Modal */}
+      <AnimatePresence>
+        {selectedThreat && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedThreat(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-2xl bg-[#0D0D0E] border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center justify-center">
+                    <ShieldAlert className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">Indicator Analysis</h2>
+                    <div className="text-[10px] text-red-400/70 font-mono uppercase tracking-tighter">ID: {selectedThreat.id}</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedThreat(null)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 opacity-50" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {/* Primary IOC Display */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Indicator of Compromise</label>
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl font-mono text-red-200 break-all selection:bg-red-500/30">
+                      {selectedThreat.ioc}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedThreat.ioc);
+                        addLog(`[UI] IOC copied to clipboard: ${selectedThreat.ioc}`);
+                      }}
+                      className="p-2 hover:bg-white/5 rounded border border-white/10 transition-colors shrink-0"
+                      title="Copy to Clipboard"
+                    >
+                      <Database className="w-4 h-4 opacity-50" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8">
+                  {/* Classification */}
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Threat Classification</label>
+                      <div className="text-sm text-white/90">{selectedThreat.threat_type_desc}</div>
+                      <div className="text-[10px] opacity-40 font-mono uppercase">Type: {selectedThreat.threat_type}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">IOC Format</label>
+                      <div className="text-sm text-white/90">{selectedThreat.ioc_type_desc}</div>
+                      <div className="text-[10px] opacity-40 font-mono uppercase">Type: {selectedThreat.ioc_type}</div>
+                    </div>
+                  </div>
+
+                  {/* Malware Attribution */}
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Malware Attribution</label>
+                      <div className="text-sm text-emerald-400 font-bold">{selectedThreat.malware_printable || 'Unknown Family'}</div>
+                      <div className="text-[10px] opacity-40 font-mono uppercase">System ID: {selectedThreat.malware}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Confidence Level</label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${selectedThreat.confidence_level > 75 ? 'bg-red-500' : selectedThreat.confidence_level > 40 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                            style={{ width: `${selectedThreat.confidence_level}%` }}
+                          />
+                        </div>
+                        <span className={`text-xs font-bold ${selectedThreat.confidence_level > 75 ? 'text-red-400' : selectedThreat.confidence_level > 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {selectedThreat.confidence_level}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Temporal Data */}
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Observation History</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                      <div className="text-[9px] uppercase opacity-40 mb-1">First Detected</div>
+                      <div className="text-xs font-mono text-white/80">{new Date(selectedThreat.first_seen).toLocaleString()}</div>
+                    </div>
+                    <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                      <div className="text-[9px] uppercase opacity-40 mb-1">Last Observed</div>
+                      <div className="text-xs font-mono text-white/80">{new Date(selectedThreat.last_seen).toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Attribution & Source */}
+                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-white/5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Intelligence Reporter</label>
+                    <div className="flex items-center gap-2 text-sm text-white/80">
+                      <User className="w-4 h-4 opacity-40" />
+                      {selectedThreat.reporter}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase opacity-40 tracking-widest font-bold">Data Source</label>
+                    <div className="flex items-center gap-2 text-sm text-white/80">
+                      <Globe className="w-4 h-4 opacity-40" />
+                      {selectedThreat.source}
+                    </div>
+                  </div>
+                </div>
+
+                {/* External Actions */}
+                <div className="flex gap-3 pt-6">
+                  <button 
+                    onClick={() => window.open(`https://www.virustotal.com/gui/search/${encodeURIComponent(selectedThreat.ioc)}`, '_blank')}
+                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20"
+                  >
+                    <ShieldAlert className="w-4 h-4" />
+                    VirusTotal Analysis
+                  </button>
+                  <button 
+                    onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedThreat.ioc)}`, '_blank')}
+                    className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                  >
+                    <SearchCode className="w-4 h-4" />
+                    Search Intelligence
+                  </button>
+                  {selectedThreat.reference && (
+                    <button 
+                      onClick={() => window.open(selectedThreat.reference, '_blank')}
+                      className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
+                      title="View Reference URL"
+                    >
+                      <ExternalLink className="w-5 h-5 opacity-60" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <footer className="max-w-7xl mx-auto p-4 flex items-center justify-between border-t border-white/5 mt-8 opacity-30 text-[9px] uppercase tracking-[0.3em]">
         <span>Aegis Core v1.0.4-STABLE</span>
